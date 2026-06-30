@@ -85,14 +85,33 @@ const buildPositionMap = (positions) => {
 
 const getDevicePositionHistory = async (deviceId, startTimeInclusive, endTimeExclusive) => {
     try {
-        const command = new GetDevicePositionHistoryCommand({
-            TrackerName: LOCATION_TRACKER_NAME,
-            DeviceId: deviceId,
-            StartTimeInclusive: startTimeInclusive,
-            EndTimeExclusive: endTimeExclusive,
-        });
-        const response = await locationClient.send(command);
-        return response.DevicePositions || [];
+        const allPositions = [];
+        let nextToken = undefined;
+
+        // AWS GetDevicePositionHistory returns max 100 results per page.
+        // We must paginate through ALL pages using NextToken.
+        do {
+            const params = {
+                TrackerName: LOCATION_TRACKER_NAME,
+                DeviceId: deviceId,
+                StartTimeInclusive: startTimeInclusive,
+                EndTimeExclusive: endTimeExclusive,
+            };
+            if (nextToken) {
+                params.NextToken = nextToken;
+            }
+
+            const command = new GetDevicePositionHistoryCommand(params);
+            const response = await locationClient.send(command);
+
+            const positions = response.DevicePositions || [];
+            allPositions.push(...positions);
+            nextToken = response.NextToken;
+
+            console.log(`[LocationService] Fetched page: ${positions.length} positions (total so far: ${allPositions.length}), hasNextPage: ${!!nextToken}`);
+        } while (nextToken);
+
+        return allPositions;
     } catch (err) {
         if (err.name === 'ResourceNotFoundException') {
             console.warn(`[LocationService] No history found for device: ${deviceId}`);
