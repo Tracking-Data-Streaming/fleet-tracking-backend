@@ -28,6 +28,12 @@ const enableAntitheft = async (req, res, next) => {
             return res.status(404).json({ success: false, message: `Device "${deviceId}" not found` });
         }
 
+        // Verify ownership
+        const ownerUserId = req.user?.sub || req.user?.username || req.user?.email || null;
+        if (device.ownerUserId !== ownerUserId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: You do not own this device' });
+        }
+
         // Current position from Location Service
         const positions = await locationService.getDevicePositions();
         const posMap = locationService.buildPositionMap(positions);
@@ -97,6 +103,12 @@ const disableAntitheft = async (req, res, next) => {
         const device = await dynamoService.getDeviceById(deviceId);
         if (!device) {
             return res.status(404).json({ success: false, message: `Device "${deviceId}" not found` });
+        }
+
+        // Verify ownership
+        const ownerUserId = req.user?.sub || req.user?.username || req.user?.email || null;
+        if (device.ownerUserId !== ownerUserId) {
+            return res.status(403).json({ success: false, message: 'Forbidden: You do not own this device' });
         }
 
         // Delete geofence (ignore if already gone)

@@ -27,9 +27,14 @@ const isValidDeviceId = (id) => {
  */
 const getAllDevices = async (req, res, next) => {
     try {
+        const ownerUserId = getOwnerUserIdFromRequest(req);
+        if (!ownerUserId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized: User ID not found' });
+        }
+
         // Fetch in parallel for performance
         const [devices, positions] = await Promise.all([
-            dynamoService.getAllDevices(),
+            dynamoService.getAllDevicesByOwner(ownerUserId),
             locationService.getDevicePositions(),
         ]);
 
@@ -88,6 +93,14 @@ const getDeviceById = async (req, res, next) => {
             });
         }
 
+        const ownerUserId = getOwnerUserIdFromRequest(req);
+        if (device.ownerUserId !== ownerUserId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Forbidden: You do not own this device',
+            });
+        }
+
         const positions = await locationService.getDevicePositions();
         const positionMap = locationService.buildPositionMap(positions);
         const pos = positionMap[id] || {};
@@ -125,6 +138,14 @@ const getDeviceHistory = async (req, res, next) => {
             return res.status(404).json({
                 success: false,
                 message: `Device "${id}" not found`,
+            });
+        }
+
+        const ownerUserId = getOwnerUserIdFromRequest(req);
+        if (device.ownerUserId !== ownerUserId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Forbidden: You do not own this device',
             });
         }
 
@@ -211,6 +232,22 @@ const updateDevice = async (req, res, next) => {
         const { id } = req.params;
         const { type, status } = req.body;
 
+        const device = await dynamoService.getDeviceById(id);
+        if (!device) {
+            return res.status(404).json({
+                success: false,
+                message: `Device "${id}" not found`,
+            });
+        }
+
+        const ownerUserId = getOwnerUserIdFromRequest(req);
+        if (device.ownerUserId !== ownerUserId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Forbidden: You do not own this device',
+            });
+        }
+
         if (type && !DEVICE_TYPES.includes(type)) {
             return res.status(400).json({
                 success: false,
@@ -251,6 +288,22 @@ const updateDevice = async (req, res, next) => {
 const deleteDevice = async (req, res, next) => {
     try {
         const { id } = req.params;
+
+        const device = await dynamoService.getDeviceById(id);
+        if (!device) {
+            return res.status(404).json({
+                success: false,
+                message: `Device "${id}" not found`,
+            });
+        }
+
+        const ownerUserId = getOwnerUserIdFromRequest(req);
+        if (device.ownerUserId !== ownerUserId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Forbidden: You do not own this device',
+            });
+        }
 
         // Run both deletions in parallel
         const [deletedDevice] = await Promise.all([

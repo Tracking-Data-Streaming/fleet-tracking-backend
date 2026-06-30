@@ -27,6 +27,21 @@ const getAllDevices = async () => {
     return response.Items || [];
 };
 
+/**
+ * Retrieve all devices belonging to a specific ownerUserId
+ * @param {string} ownerUserId
+ * @returns {Array}
+ */
+const getAllDevicesByOwner = async (ownerUserId) => {
+    const command = new ScanCommand({
+        TableName: DYNAMODB_DEVICES_TABLE,
+        FilterExpression: 'ownerUserId = :ownerUserId',
+        ExpressionAttributeValues: { ':ownerUserId': ownerUserId },
+    });
+    const response = await dynamoDBDocumentClient.send(command);
+    return response.Items || [];
+};
+
 // ─── GET ONE ───────────────────────────────────────────────────────────────
 
 /**
@@ -219,6 +234,7 @@ const setAntitheftAlerted = async (deviceId, alerted) => {
 
 module.exports = {
     getAllDevices,
+    getAllDevicesByOwner,
     getDeviceById,
     createDevice,
     updateDevice,
