@@ -150,7 +150,7 @@ const getDeviceHistory = async (req, res, next) => {
         }
 
         const end = endTime ? new Date(endTime) : new Date();
-        const start = startTime ? new Date(startTime) : new Date(end.getTime() - 24 * 60 * 60 * 1000);
+        const start = startTime ? new Date(startTime) : new Date(end.getTime() - 72 * 60 * 60 * 1000); // Default to last 3 days (72 hours)
 
         const history = await locationService.getDevicePositionHistory(id, start, end);
 
