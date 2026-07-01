@@ -4,6 +4,7 @@ const {
     UpdateCommand,
     DeleteCommand,
     ScanCommand,
+    QueryCommand,
 } = require('@aws-sdk/lib-dynamodb');
 const { dynamoDBDocumentClient } = require('../config/aws');
 const { DYNAMODB_DEVICES_TABLE } = require('../config/constants');
@@ -33,9 +34,10 @@ const getAllDevices = async () => {
  * @returns {Array}
  */
 const getAllDevicesByOwner = async (ownerUserId) => {
-    const command = new ScanCommand({
+    const command = new QueryCommand({
         TableName: DYNAMODB_DEVICES_TABLE,
-        FilterExpression: 'ownerUserId = :ownerUserId',
+        IndexName: 'ownerUserId-index',
+        KeyConditionExpression: 'ownerUserId = :ownerUserId',
         ExpressionAttributeValues: { ':ownerUserId': ownerUserId },
     });
     const response = await dynamoDBDocumentClient.send(command);
@@ -154,13 +156,14 @@ const deleteDevice = async (deviceId) => {
 // ─── ANTI-THEFT ────────────────────────────────────────────────────────────
 
 /**
- * Scan for all devices with antitheftEnabled = true
+ * Retrieve all devices with antitheftEnabledStr = 'true'
  */
 const getAntitheftEnabledDevices = async () => {
-    const command = new ScanCommand({
+    const command = new QueryCommand({
         TableName: DYNAMODB_DEVICES_TABLE,
-        FilterExpression: 'antitheftEnabled = :val',
-        ExpressionAttributeValues: { ':val': true },
+        IndexName: 'antitheftEnabledStr-index',
+        KeyConditionExpression: 'antitheftEnabledStr = :val',
+        ExpressionAttributeValues: { ':val': 'true' },
     });
     const response = await dynamoDBDocumentClient.send(command);
     return response.Items || [];
@@ -176,16 +179,18 @@ const enableAntitheftForDevice = async (deviceId, { antitheftLat, antitheftLng, 
         TableName: DYNAMODB_DEVICES_TABLE,
         Key: { deviceId },
         UpdateExpression: [
-            'SET antitheftEnabled   = :e',
-            '    antitheftLat       = :lat',
-            '    antitheftLng       = :lng',
-            '    antitheftRadius    = :r',
-            '    antitheftAlerted   = :a',
-            '    antitheftEnabledAt = :t',
-            '    updatedAt          = :u',
+            'SET antitheftEnabled    = :e',
+            '    antitheftEnabledStr = :estr',
+            '    antitheftLat        = :lat',
+            '    antitheftLng        = :lng',
+            '    antitheftRadius     = :r',
+            '    antitheftAlerted    = :a',
+            '    antitheftEnabledAt  = :t',
+            '    updatedAt           = :u',
         ].join(', '),
         ExpressionAttributeValues: {
             ':e': true,
+            ':estr': 'true',
             ':lat': antitheftLat,
             ':lng': antitheftLng,
             ':r': antitheftRadius,
@@ -205,9 +210,10 @@ const disableAntitheftForDevice = async (deviceId) => {
     const command = new UpdateCommand({
         TableName: DYNAMODB_DEVICES_TABLE,
         Key: { deviceId },
-        UpdateExpression: 'SET antitheftEnabled = :e, antitheftAlerted = :a, updatedAt = :u REMOVE antitheftLat, antitheftLng, antitheftRadius, antitheftEnabledAt',
+        UpdateExpression: 'SET antitheftEnabled = :e, antitheftEnabledStr = :estr, antitheftAlerted = :a, updatedAt = :u REMOVE antitheftLat, antitheftLng, antitheftRadius, antitheftEnabledAt',
         ExpressionAttributeValues: {
             ':e': false,
+            ':estr': 'false',
             ':a': false,
             ':u': new Date().toISOString(),
         },
